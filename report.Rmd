@@ -1,0 +1,170 @@
+---
+title: "TCGA"
+author: "Mobina Mahmoodzade"
+date: "2023-03-03"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+The objective is to automatically download, save, plot three TCGA projects, and generate a report.
+
+```{r echo=TRUE, eval=FALSE}
+library(TCGAbiolinks)
+library(maftools)
+library(rmarkdown)
+
+projects <- c("ACC", "BRCA", "SARC")
+```
+
+1. Empty files are created in the wanted order.
+
+```{r echo=TRUE, eval=FALSE}
+working_dir <- getwd()
+in_dir <- paste(working_dir, "inputs", sep = "/")
+maf_dir <- paste(in_dir, "maf", sep = "/")
+out_dir <- paste(working_dir, "outputs", sep = "/")
+report_dir <- paste(out_dir, "Report", sep = "/")
+
+
+for(file in c(in_dir, maf_dir, out_dir, report_dir)) if(!file.exists(file)) dir.create(file)
+for(file in projects)
+{
+  idir <- paste(maf_dir, file, sep = "/")
+  if(!file.exists(idir)) dir.create(idir)
+  
+  odir <- paste(out_dir, file, sep = "/")
+  if(!file.exists(odir)) dir.create(odir)
+}
+```
+
+2. Maf files are downloaded and saved in another directory. The address of this directory needs to be short, otherwise an error will pop up. Then maf files are read and saved in **RData** format. They can be removed using the argument `remove.files.prepared = TRUE` of the function `GDCprepare()`. The important point is to change the working directory at the end of each round of the *for* loop.
+
+```{r echo=TRUE, eval=FALSE}
+for(file in projects)
+{
+  proj_name <- paste("TCGA", file, sep = "-")
+  file_name <- paste(file, "maf.RData", sep = "_")
+  file_directory <- paste("C:", file, sep = "/")
+  new_dir <- paste(maf_dir, file, sep = "/")
+  setwd(new_dir)
+  
+  if(!file.exists(file_name))
+  {
+    query <- GDCquery(project = proj_name, access = "open",
+                      data.category = "Simple Nucleotide Variation",
+                      data.type = "Masked Somatic Mutation")
+    GDCdownload(query, directory = file_directory)
+    maf <- GDCprepare(query, save = TRUE, save.filename = file_name,
+                      directory = file_directory)
+  }
+  setwd(working_dir)
+}
+```
+
+3. Four types of plots are generated for each data. The plots are saved in *png* and *pdf* format in the directories created earlier. 
+
+```{r echo=TRUE, eval=FALSE}
+for(file in projects)
+{
+  file_name <- paste(file, "maf.RData", sep = "_")
+  new_dir <- paste(maf_dir, file, sep = "/")
+  setwd(new_dir)
+  load(file_name)
+  data <- read.maf(data)
+  pdf_dir <- paste(out_dir, file, sep = "/")
+  png_dir <- paste(out_dir, file, sep = "/")
+  
+  
+  pdf(paste(pdf_dir, paste("oncoplot", "pdf", sep = "."), sep = "/"))
+  oncoplot(data, top = 10)
+  dev.off()
+  
+  png(paste(png_dir, paste("oncoplot", "png", sep = "."), sep = "/"))
+  oncoplot(data, top = 10)
+  dev.off()
+  
+  
+  pdf(paste(pdf_dir, paste("lollipopPlot", "pdf", sep = "."), sep = "/"))
+  lollipopPlot(data, gene = "TP53", AACol = "HGVSp_Short")
+  dev.off()
+  
+  png(paste(png_dir, paste("lollipopPlot", "png", sep = "."), sep = "/"))
+  lollipopPlot(data, gene = "TP53", AACol = "HGVSp_Short")
+  dev.off()
+  
+  
+  pdf(paste(pdf_dir, paste("rainfallPlot", "pdf", sep = "."), sep = "/"))
+  rainfallPlot(data)
+  dev.off()
+  
+  png(paste(png_dir, paste("rainfallPlot", "png", sep = "."), sep = "/"))
+  rainfallPlot(data)
+  dev.off()
+  
+  
+  pdf(paste(pdf_dir, paste("plotVaf", "pdf", sep = "."), sep = "/"))
+  plotVaf(data)
+  dev.off()
+  
+  png(paste(png_dir, paste("plotVaf", "png", sep = "."), sep = "/"))
+  plotVaf(data)
+  dev.off()
+}
+```
+
+Some of the plots are shown below...
+
+SARC --> oncoplot for top ten genes
+
+```{r echo=FALSE, fig.keep='all', results='hide', message=FALSE}
+file_path <- paste(maf_dir, "SARC", "SARC_maf.RData", sep = "/")
+load(file_path)
+data <- read.maf(data)
+oncoplot(data, top = 10)
+```
+
+BRCA --> lollipopPlot for TP53
+
+```{r echo=FALSE, fig.keep='all', results='hide', message=FALSE}
+file_path <- paste(maf_dir, "BRCA", "BRCA_maf.RData", sep = "/")
+load(file_path)
+data <- read.maf(data)
+lollipopPlot(data, gene = "TP53", AACol = "HGVSp_Short")
+```
+
+ACC --> rainfallPlot
+
+```{r echo=FALSE, fig.keep='all', results='hide', message=FALSE}
+file_path <- paste(maf_dir, "ACC", "ACC_maf.RData", sep = "/")
+load(file_path)
+data <- read.maf(data)
+rainfallPlot(data)
+```
+
+SARC --> plotVaf
+
+```{r echo=FALSE, fig.keep='all', message=FALSE, results='hide'}
+file_path <- paste(maf_dir, "SARC", "SARC_maf.RData", sep = "/")
+load(file_path)
+data <- read.maf(data)
+plotVaf(data)
+```
+
+And finally converting rmarkdown file to pdf is automated.
+
+```{r echo=TRUE, eval=FALSE}
+setwd(working_dir)
+rmarkdown::render(input = "report.Rmd", output_format = "pdf_document",
+                  output_file = "Report.pdf", output_dir = report_dir)
+```
+
+
+
+
+
+
+
+
